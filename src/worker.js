@@ -2,7 +2,7 @@ import { TRANSFER_TOPIC, decodeTransferLog, buildBlockRange, hexBlock, classifyM
 
 const DEFAULT_CHAIN_ID = '4663';
 const DEFAULT_RPC_TIMEOUT_MS = 3000;
-const MAX_INDEX_BLOCKS = 50;
+const MAX_INDEX_BLOCKS = 5;
 
 function freshness(observedAt, now = Date.now()) {
   if (!observedAt) return 'unknown';

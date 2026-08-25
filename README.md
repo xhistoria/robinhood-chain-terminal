@@ -64,4 +64,4 @@ npx wrangler d1 migrations apply robinhood-chain-terminal --remote
 npx wrangler deploy
 ```
 
-The Cron Trigger runs every minute and processes at most 50 blocks per run. If it falls behind, the UI/API should be extended with a visible backfill lag indicator before increasing the bound.
+The Cron Trigger runs every minute and processes at most 5 blocks per run. If it falls behind, the UI/API should be extended with a visible backfill lag indicator before increasing the bound.
