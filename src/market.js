@@ -11,6 +11,15 @@ export function marketStatusFromError(error) {
   return error?.message === 'market_timeout' ? 'provider_timeout' : 'provider_unavailable';
 }
 
+export function summarizeMarketStatuses(statuses = []) {
+  const values = new Set(statuses);
+  if (values.has('live')) return 'live';
+  if (values.has('partial')) return 'partial';
+  if (values.has('provider_timeout')) return 'provider_timeout';
+  if (values.has('provider_unavailable')) return 'provider_unavailable';
+  return 'unknown';
+}
+
 export async function fetchMarketData({ address, fetchImpl = fetch, timeoutMs = 2500 } = {}) {
   const controller = typeof AbortController === 'function' ? new AbortController() : null;
   let timer;

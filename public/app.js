@@ -14,7 +14,8 @@ function renderAssets(data) {
   const assets = data.assets || [];
   $('#asset-count').textContent = assets.length.toLocaleString();
   $('#asset-detail').textContent = data.freshness === 'database' ? 'Persisted transfer index' : 'Database unavailable';
-  $('#market-note').textContent = data.marketData?.status === 'unknown' ? 'Market price and liquidity: Unknown — no supported market provider is configured.' : `Market data: ${data.marketData.status}`;
+  const marketStatus = data.marketData?.status || 'unknown';
+  $('#market-note').textContent = marketStatus === 'unknown' ? 'Market coverage: Unknown — no pair was returned by the provider.' : marketStatus === 'provider_unavailable' ? 'Market provider: Unavailable — price and liquidity are withheld.' : marketStatus === 'provider_timeout' ? 'Market provider: Timeout — price and liquidity are withheld.' : `Market data: ${marketStatus}`;
   $('#assets').innerHTML = assets.length ? assets.map((asset) => `<article class="asset"><div><strong>${esc(asset.symbol || 'Unknown asset')}</strong><small>${esc(asset.address)}</small></div><div class="asset-stats"><span>${Number(asset.transfer_count || 0).toLocaleString()} transfers</span><span>${Number(asset.unique_senders || 0).toLocaleString()} senders</span></div><button class="passport-button" data-address="${esc(asset.address)}">Passport</button><button class="watch" data-address="${esc(asset.address)}">Watch</button><span class="state">${esc(asset.market_status || 'unknown')}</span></article>`).join('') : '<div class="empty">No ERC-20 Transfer events indexed yet. The cron indexer will populate this list.</div>';
   document.querySelectorAll('.watch').forEach((button) => button.addEventListener('click', () => addWatchlist(button.dataset.address)));
   document.querySelectorAll('.passport-button').forEach((button) => button.addEventListener('click', () => loadPassport(button.dataset.address)));

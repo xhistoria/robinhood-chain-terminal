@@ -1,7 +1,7 @@
 import { TRANSFER_TOPIC, decodeTransferLog, buildBlockRange, hexBlock, classifyMarketData } from './indexer.js';
 import { buildTradeabilityPassport, calculatePaperPnl, normalizeAlert } from './product.js';
 import { decodeAbiString, decodeAbiUint, metadataCallData, normalizeMetadata } from './metadata.js';
-import { fetchMarketData, marketStatusFromError } from './market.js';
+import { fetchMarketData, marketStatusFromError, summarizeMarketStatuses } from './market.js';
 
 const DEFAULT_CHAIN_ID = '4663';
 const DEFAULT_RPC_TIMEOUT_MS = 3000;
@@ -116,6 +116,13 @@ async function enrichMarketData({ db, fetchImpl = fetch, now = new Date().toISOS
     }
   }
   return { status: 'completed', enriched };
+}
+
+async function marketSummary(db) {
+  if (!db) return { status: 'unknown', price: null, liquidityUsd: null, source: null };
+  const result = await db.prepare('SELECT market_status FROM assets').all();
+  const status = summarizeMarketStatuses((result.results || []).map((row) => row.market_status));
+  return { status, price: null, liquidityUsd: null, source: status === 'unknown' ? null : 'dexscreener' };
 }
 
 async function listAssets(db, limit = 50) {
@@ -233,7 +240,7 @@ async function handle(request, env, ctx) {
   const url = new URL(request.url);
   if (url.pathname === '/api/health') return Response.json({ ok: true, service: 'robinhood-chain-terminal' });
   if (url.pathname === '/api/chain-status') return Response.json(await getStatus(env, fetch), { headers: { 'Cache-Control': 'no-store' } });
-  if (url.pathname === '/api/assets') return Response.json({ assets: await listAssets(env.DB, url.searchParams.get('limit')), marketData: classifyMarketData(), freshness: env.DB ? 'database' : 'unknown' }, { headers: { 'Cache-Control': 'no-store' } });
+  if (url.pathname === '/api/assets') return Response.json({ assets: await listAssets(env.DB, url.searchParams.get('limit')), marketData: await marketSummary(env.DB), freshness: env.DB ? 'database' : 'unknown' }, { headers: { 'Cache-Control': 'no-store' } });
   if (url.pathname === '/api/watchlist' && request.method === 'GET') return Response.json({ watchlist: await listWatchlist(env.DB) }, { headers: { 'Cache-Control': 'no-store' } });
   if (url.pathname === '/api/watchlist' && request.method === 'POST') return Response.json(await addWatchlist(env.DB, (await request.json()).assetAddress), { status: 201 });
   if (url.pathname.startsWith('/api/watchlist/') && request.method === 'DELETE') return Response.json(await removeWatchlist(env.DB, url.pathname.slice('/api/watchlist/'.length)));
