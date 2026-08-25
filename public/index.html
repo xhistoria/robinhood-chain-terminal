@@ -8,14 +8,15 @@
 </head>
 <body>
   <main class="shell">
-    <header class="topbar"><div><span class="kicker">ROBINHOOD CHAIN</span><h1>Tradeability Terminal</h1><p>Read-only market and chain monitoring with explicit freshness.</p></div><span id="mode" class="badge">POLLING MVP</span></header>
+    <header class="topbar"><div><span class="kicker">ROBINHOOD CHAIN</span><h1>Tradeability Terminal</h1><p>Read-only chain, asset activity, and market-quality monitoring.</p></div><span id="mode" class="badge">POLLING MVP</span></header>
     <section class="grid">
       <article class="card"><span class="label">CHAIN STATUS</span><strong id="status">Loading…</strong><small id="status-detail">Checking provider</small></article>
       <article class="card"><span class="label">LATEST BLOCK</span><strong id="block">Unknown</strong><small id="block-detail">No confirmed observation</small></article>
-      <article class="card"><span class="label">LATENCY</span><strong id="latency">Unknown</strong><small>RPC observation</small></article>
+      <article class="card"><span class="label">RPC LATENCY</span><strong id="latency">Unknown</strong><small>Latest observation</small></article>
+      <article class="card"><span class="label">INDEXED ASSETS</span><strong id="asset-count">Unknown</strong><small id="asset-detail">Waiting for indexer</small></article>
     </section>
-    <section class="panel"><div class="panel-head"><div><span class="kicker">ASSET INTELLIGENCE</span><h2>Tradeability Passport</h2></div><button id="refresh">Refresh</button></div><div id="assets" class="empty">No asset data has been indexed yet.</div></section>
-    <footer>Provider failures remain visible as unknown or stale states. This MVP never substitutes fabricated data.</footer>
+    <section class="panel"><div class="panel-head"><div><span class="kicker">ASSET INTELLIGENCE</span><h2>Tradeability Passport</h2></div><button id="refresh">Refresh</button></div><div id="market-note" class="notice">Market price and liquidity are shown only when a supported market provider is configured.</div><div id="assets" class="asset-list"><div class="empty">No asset data has been indexed yet.</div></div></section>
+    <footer>Provider failures remain visible as unknown or stale states. This terminal never substitutes fabricated price, liquidity, or asset identity.</footer>
   </main>
   <script src="/app.js" defer></script>
 </body>

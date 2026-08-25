@@ -51,3 +51,17 @@ The RPC URL is never committed. If `RPC_URL` is missing, the API returns an expl
 npm test
 npm run check
 ```
+## Current capabilities
+
+- Phase 1: bounded ERC-20 `Transfer` event discovery with D1 cursor, deduplication, and backfill window.
+- Phase 2: persisted token asset list, transfer activity counts, unique sender counts, and asset detail API.
+- Phase 3: market-quality state contract. Price/liquidity remain `Unknown` until an explicitly configured supported market provider returns valid values; transfer activity is never presented as price or liquidity.
+
+## Deploy after code changes
+
+```bash
+npx wrangler d1 migrations apply robinhood-chain-terminal --remote
+npx wrangler deploy
+```
+
+The Cron Trigger runs every minute and processes at most 50 blocks per run. If it falls behind, the UI/API should be extended with a visible backfill lag indicator before increasing the bound.
