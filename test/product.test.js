@@ -12,6 +12,13 @@ test('builds a transparent passport without opaque risk score', () => {
   assert.equal('riskScore' in passport, false);
 });
 
+test('requires all critical evidence before marking passport strong', () => {
+  const passport = buildTradeabilityPassport({ transferCount: 2, market: { status: 'live' }, transferability: 'verified', issuer: 'known', underlying: 'known' });
+  assert.equal(passport.coverage, 'strong');
+  assert.equal(passport.manualReview, false);
+  assert.equal(buildTradeabilityPassport({ transferCount: 2, market: { status: 'live' } }).manualReview, true);
+});
+
 test('calculates paper P/L only from explicit entry and current values', () => {
   assert.deepEqual(calculatePaperPnl({ quantity: 2, entryPrice: 10, currentPrice: 12 }), { invested: 20, currentValue: 24, pnlAbsolute: 4, pnlPercent: 20, status: 'calculated' });
   assert.equal(calculatePaperPnl({ quantity: 2, entryPrice: 10, currentPrice: null }).status, 'unknown');

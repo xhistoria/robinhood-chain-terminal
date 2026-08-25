@@ -5,7 +5,10 @@ export function buildTradeabilityPassport(asset = {}) {
   const uniqueSenders = Number(asset.uniqueSenders || 0);
   const marketStatus = asset.market?.status || 'unknown';
   const activity = transferCount > 0 ? 'observed' : 'unknown';
-  const coverage = marketStatus === 'live' && activity === 'observed' ? 'strong' : activity === 'observed' ? 'partial' : 'limited';
+  const transferability = asset.transferability || 'unknown';
+  const issuer = asset.issuer || 'unknown';
+  const underlying = asset.underlying || 'unknown';
+  const coverage = marketStatus === 'live' && activity === 'observed' && transferability !== 'unknown' && issuer !== 'unknown' && underlying !== 'unknown' ? 'strong' : activity === 'observed' ? 'partial' : 'limited';
   return {
     address: asset.address || null,
     coverage,
