@@ -3,22 +3,52 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#050706">
   <title>Robinhood Chain Terminal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2/src/regular/style.css">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <main class="shell">
-    <header class="topbar"><div><span class="kicker">ROBINHOOD CHAIN</span><h1>Tradeability Terminal</h1><p>Read-only chain, asset activity, and market-quality monitoring.</p></div><span id="mode" class="badge">POLLING MVP</span></header>
-    <section class="grid">
-      <article class="card"><span class="label">CHAIN STATUS</span><strong id="status">Loading…</strong><small id="status-detail">Checking provider</small></article>
-      <article class="card"><span class="label">LATEST BLOCK</span><strong id="block">Unknown</strong><small id="block-detail">No confirmed observation</small></article>
-      <article class="card"><span class="label">RPC LATENCY</span><strong id="latency">Unknown</strong><small>Latest observation</small></article>
-      <article class="card"><span class="label">INDEXED ASSETS</span><strong id="asset-count">Unknown</strong><small id="asset-detail">Waiting for indexer</small></article>
+  <a class="skip-link" href="#main-content">Skip to terminal</a>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Robinhood Chain Terminal home"><span class="brand-mark"><i class="ph ph-chart-line-up" aria-hidden="true"></i></span><span>ROBINHOOD CHAIN</span></a>
+    <nav class="nav-pill" aria-label="Primary navigation"><a class="nav-link is-active" href="#main-content"><i class="ph ph-squares-four" aria-hidden="true"></i><span>Terminal</span></a><span class="nav-status"><i class="ph ph-broadcast" aria-hidden="true"></i> Polling · 30s</span></nav>
+  </header>
+
+  <main id="main-content" class="shell">
+    <section class="hero" aria-labelledby="page-title">
+      <div class="hero-copy"><span class="eyebrow">READ-ONLY CHAIN INTELLIGENCE</span><h1 id="page-title">Tradeability<br><em>Terminal.</em></h1><p>Observe Robinhood Chain activity, market coverage, and asset evidence without pretending unknowns are facts.</p></div>
+      <div class="hero-meta"><span class="live-chip"><i class="ph-fill ph-circle" aria-hidden="true"></i> NEAR-REAL-TIME</span><span class="chain-id">CHAIN ID <strong>4663</strong></span></div>
     </section>
-    <section class="panel"><div class="panel-head"><div><span class="kicker">ASSET INTELLIGENCE</span><h2>Tradeability Passport</h2></div><button id="refresh">Refresh</button></div><div id="market-note" class="notice">Market price and liquidity are shown only when a supported market provider is configured.</div><div id="assets" class="asset-list"><div class="empty">No asset data has been indexed yet.</div></div><div id="passport-view" class="passport empty">Select an asset to inspect its passport.</div></section>
-    <section class="split"><section class="panel"><span class="kicker">WATCHLIST</span><h2>Tracked assets</h2><div id="watchlist" class="empty">No assets watchlisted.</div></section><section class="panel"><span class="kicker">PAPER EXECUTION</span><h2>Journal a simulation</h2><form id="paper-form" class="form"><input id="paper-address" placeholder="Token address (0x…)" required><select id="paper-side"><option value="buy">Paper buy</option><option value="sell">Paper sell</option></select><input id="paper-quantity" type="number" min="0" step="any" placeholder="Quantity" required><input id="paper-price" type="number" min="0" step="any" placeholder="Entry price (optional)"><button type="submit">Save paper trade</button></form><div id="paper-status" class="notice">Paper-only. No wallet, signing, or broadcast.</div></section></section>
-    <section class="split"><section class="panel"><span class="kicker">ALERT RULES</span><h2>Monitor activity</h2><form id="alert-form" class="form"><input id="alert-address" placeholder="Token address (0x…)" required><select id="alert-kind"><option value="transfer_activity">Transfer activity</option><option value="new_asset">New asset</option><option value="market_data_available">Market data available</option></select><input id="alert-threshold" type="number" min="0" step="1" placeholder="Transfer threshold (optional)"><button type="submit">Save alert</button></form><div id="alert-status" class="notice">Alerts are evaluated by the scheduled indexer.</div></section><section class="panel"><span class="kicker">ALERT EVENTS</span><h2>Recent triggers</h2><div id="alert-events" class="empty">No alert events.</div></section></section>
-    <footer>Provider failures remain visible as unknown or stale states. This terminal never substitutes fabricated price, liquidity, or asset identity.</footer>
+
+    <section class="metric-grid" aria-label="Chain metrics">
+      <article class="metric-card"><div class="metric-label"><i class="ph ph-pulse" aria-hidden="true"></i> CHAIN STATUS</div><strong id="status">Loading…</strong><small id="status-detail">Checking provider</small></article>
+      <article class="metric-card"><div class="metric-label"><i class="ph ph-cube" aria-hidden="true"></i> LATEST BLOCK</div><strong id="block">Unknown</strong><small id="block-detail">No confirmed observation</small></article>
+      <article class="metric-card"><div class="metric-label"><i class="ph ph-lightning" aria-hidden="true"></i> RPC LATENCY</div><strong id="latency">Unknown</strong><small>Latest observation</small></article>
+      <article class="metric-card metric-card-accent"><div class="metric-label"><i class="ph ph-stack" aria-hidden="true"></i> INDEXED ASSETS</div><strong id="asset-count">Unknown</strong><small id="asset-detail">Waiting for indexer</small></article>
+    </section>
+
+    <section class="panel asset-panel" aria-labelledby="assets-title">
+      <div class="panel-head"><div><span class="eyebrow">ASSET INTELLIGENCE</span><h2 id="assets-title">Tradeability Passport</h2></div><button id="refresh" class="button button-ghost"><i class="ph ph-arrows-clockwise" aria-hidden="true"></i><span>Refresh</span></button></div>
+      <div id="market-note" class="notice"><i class="ph ph-info" aria-hidden="true"></i><span>Market coverage is queried from an external provider and remains explicit when unavailable.</span></div>
+      <div id="assets" class="asset-list"><div class="empty"><i class="ph ph-spinner-gap" aria-hidden="true"></i><span>No asset data has been indexed yet.</span></div></div>
+      <div id="passport-view" class="passport empty"><i class="ph ph-identification-card" aria-hidden="true"></i><span>Select an asset to inspect its passport.</span></div>
+    </section>
+
+    <section class="split" aria-label="Tracking and paper execution">
+      <section class="panel" aria-labelledby="watch-title"><div class="panel-heading"><span class="eyebrow">WATCHLIST</span><h2 id="watch-title">Tracked assets</h2></div><div id="watchlist" class="empty"><i class="ph ph-eye-slash" aria-hidden="true"></i><span>No assets watchlisted.</span></div></section>
+      <section class="panel" aria-labelledby="paper-title"><div class="panel-heading"><span class="eyebrow">PAPER EXECUTION</span><h2 id="paper-title">Journal a simulation</h2></div><form id="paper-form" class="form"><label for="paper-address">Asset address</label><input id="paper-address" placeholder="0x…" required><label for="paper-side">Side</label><select id="paper-side"><option value="buy">Paper buy</option><option value="sell">Paper sell</option></select><label for="paper-quantity">Quantity</label><input id="paper-quantity" type="number" min="0" step="any" placeholder="Quantity" required><label for="paper-price">Entry price <span>(optional)</span></label><input id="paper-price" type="number" min="0" step="any" placeholder="Unknown if empty"><button type="submit" class="button button-primary"><i class="ph ph-notebook" aria-hidden="true"></i> Save paper trade</button></form><div id="paper-status" class="notice notice-subtle"><i class="ph ph-shield-check" aria-hidden="true"></i><span>Paper-only. No wallet, signing, or broadcast.</span></div></section>
+    </section>
+
+    <section class="split" aria-label="Alerts">
+      <section class="panel" aria-labelledby="alert-title"><div class="panel-heading"><span class="eyebrow">ALERT RULES</span><h2 id="alert-title">Monitor activity</h2></div><form id="alert-form" class="form"><label for="alert-address">Asset address</label><input id="alert-address" placeholder="0x…" required><label for="alert-kind">Rule</label><select id="alert-kind"><option value="transfer_activity">Transfer activity</option><option value="new_asset">New asset</option><option value="market_data_available">Market data available</option></select><label for="alert-threshold">Threshold <span>(optional)</span></label><input id="alert-threshold" type="number" min="0" step="1" placeholder="Transfers"><button type="submit" class="button button-primary"><i class="ph ph-bell-ringing" aria-hidden="true"></i> Save alert</button></form><div id="alert-status" class="notice notice-subtle"><i class="ph ph-clock" aria-hidden="true"></i><span>Alerts are evaluated by the scheduled indexer.</span></div></section>
+      <section class="panel" aria-labelledby="events-title"><div class="panel-heading"><span class="eyebrow">ALERT EVENTS</span><h2 id="events-title">Recent triggers</h2></div><div id="alert-events" class="empty"><i class="ph ph-bell-slash" aria-hidden="true"></i><span>No alert events.</span></div></section>
+    </section>
+
+    <footer class="site-footer"><span>Unknown states are product features, not missing polish.</span><span>Robinhood Chain · 4663</span></footer>
   </main>
   <script src="/app.js" defer></script>
 </body>
