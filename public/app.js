@@ -15,8 +15,17 @@ function renderAssets(data) {
   $('#asset-count').textContent = assets.length.toLocaleString();
   $('#asset-detail').textContent = data.freshness === 'database' ? 'Persisted transfer index' : 'Database unavailable';
   $('#market-note').textContent = data.marketData?.status === 'unknown' ? 'Market price and liquidity: Unknown — no supported market provider is configured.' : `Market data: ${data.marketData.status}`;
-  $('#assets').innerHTML = assets.length ? assets.map((asset) => `<article class="asset"><div><strong>${esc(asset.symbol || 'Unknown asset')}</strong><small>${esc(asset.address)}</small></div><div class="asset-stats"><span>${Number(asset.transfer_count || 0).toLocaleString()} transfers</span><span>${Number(asset.unique_senders || 0).toLocaleString()} senders</span></div><button class="watch" data-address="${esc(asset.address)}">Watch</button><span class="state">${esc(asset.market_status || 'unknown')}</span></article>`).join('') : '<div class="empty">No ERC-20 Transfer events indexed yet. The cron indexer will populate this list.</div>';
+  $('#assets').innerHTML = assets.length ? assets.map((asset) => `<article class="asset"><div><strong>${esc(asset.symbol || 'Unknown asset')}</strong><small>${esc(asset.address)}</small></div><div class="asset-stats"><span>${Number(asset.transfer_count || 0).toLocaleString()} transfers</span><span>${Number(asset.unique_senders || 0).toLocaleString()} senders</span></div><button class="passport-button" data-address="${esc(asset.address)}">Passport</button><button class="watch" data-address="${esc(asset.address)}">Watch</button><span class="state">${esc(asset.market_status || 'unknown')}</span></article>`).join('') : '<div class="empty">No ERC-20 Transfer events indexed yet. The cron indexer will populate this list.</div>';
   document.querySelectorAll('.watch').forEach((button) => button.addEventListener('click', () => addWatchlist(button.dataset.address)));
+  document.querySelectorAll('.passport-button').forEach((button) => button.addEventListener('click', () => loadPassport(button.dataset.address)));
+}
+
+async function loadPassport(address) {
+  const response = await fetch(`/api/assets/${encodeURIComponent(address)}`, { cache: 'no-store' });
+  const data = await response.json();
+  const passport = data.passport;
+  if (!passport) { $('#passport-view').textContent = data.error || 'Passport unavailable'; return; }
+  $('#passport-view').innerHTML = `<div class="passport-head"><div><span class="kicker">PASSPORT</span><strong>${esc(passport.address)}</strong></div><span class="state">${esc(passport.coverage)}</span></div><div class="passport-grid"><span>Transfer activity<strong>${esc(passport.transferActivity)}</strong></span><span>Market data<strong>${esc(passport.marketData)}</strong></span><span>Transferability<strong>${esc(passport.transferability)}</strong></span><span>Manual review<strong>${passport.manualReview ? 'Required' : 'Not required'}</strong></span></div><small>Unknown fields: ${esc(passport.unknowns.join(', ') || 'none')}</small>`;
 }
 
 function renderWatchlist(data) {
