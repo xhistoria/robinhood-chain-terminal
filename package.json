@@ -1,0 +1,15 @@
+{
+  "name": "robinhood-chain-terminal",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare-first near-real-time monitoring terminal for Robinhood Chain.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "node --test test/*.test.js",
+    "check": "node --check src/worker.js"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
