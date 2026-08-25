@@ -13,7 +13,7 @@ CHAIN_ID = "4663"
 [[d1_databases]]
 binding = "DB"
 database_name = "robinhood-chain-terminal"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "12128e71-0502-4a3b-9343-08aeb350eb38"
 migrations_dir = "migrations"
 
 [triggers]
