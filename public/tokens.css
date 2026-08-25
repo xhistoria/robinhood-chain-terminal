@@ -1,0 +1,152 @@
+/* ==========================================================================
+   Dark Product Landing — design tokens
+   --------------------------------------------------------------------------
+   Drop-in token layer for dark, high-contrast product/fintech landing pages.
+
+   Import this BEFORE your own stylesheet:
+     @import "tokens.css";
+
+   The structural values (spacing, radius, type scale, motion, surface ladder)
+   are the reusable part — keep them. The three brand hues at the top are
+   placeholders: replace them with your own before shipping anything public.
+   ========================================================================== */
+
+:root {
+  /* ── Brand — REPLACE THESE ────────────────────────────────────────────
+     Pick one accent and one hover state. A single saturated accent against
+     a near-black ladder is what carries this style; two accents dilute it. */
+  --accent: #c3f53c;
+  --accent-hover: #d4ff5c;
+  --accent-ink: #0a0c0b;        /* text placed on the accent */
+
+  /* ── Surface ladder ───────────────────────────────────────────────────
+     Five steps from page background to raised chip. Each step is a small
+     lift, never a jump — that is what keeps a dark UI from looking muddy. */
+  --canvas: #050706;            /* page background, darkest */
+  --canvas-deep: #080b09;       /* footer / full-bleed sections */
+  --surface-1: #101510;         /* cards, panels */
+  --surface-2: #161c16;         /* hovered or nested cards */
+  --surface-3: #202820;         /* chips, badges, inset controls */
+
+  /* An embedded "app" mockup reads best on its own colder, near-black
+     ladder, so it looks like a separate product surface, not a page card. */
+  --app-bg: #090909;
+  --app-card: #0e0e0e;
+  --app-line: #1c1c1c;
+  --app-line-soft: #242824;
+
+  /* ── Ink ──────────────────────────────────────────────────────────────
+     Three weights only. Resist adding a fourth; use opacity instead. */
+  --ink: #f3f5ef;               /* headings, primary text */
+  --ink-soft: #aeb6ac;          /* body copy, links */
+  --ink-muted: #798378;         /* labels, meta, captions */
+
+  /* ── Lines ────────────────────────────────────────────────────────────
+     Borders are light-on-dark at very low alpha, never solid grey. */
+  --line: rgba(239, 245, 235, 0.1);
+  --line-strong: rgba(239, 245, 235, 0.18);
+  --line-hairline: rgba(243, 245, 239, 0.09);
+
+  /* ── Fonts ────────────────────────────────────────────────────────────
+     Inter for everything. Load only 400/500/600 — this system never uses
+     light or bold display type. Phosphor is loaded per-weight; see DESIGN.md.
+
+       <link rel="preconnect" href="https://fonts.googleapis.com">
+       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"> */
+  --font-sans: Inter, "Inter Variable", system-ui, -apple-system,
+               "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo,
+               Consolas, monospace;
+  --font-icon: Phosphor;        /* set by @phosphor-icons/web; never override */
+
+  /* Inter renders better with contextual alternates on and its slashed zero
+     enabled for anything numeric (addresses, hashes, figures). */
+  --font-features: "cv05" 1, "cv08" 1, "calt" 1;
+
+  /* ── Icon sizes ───────────────────────────────────────────────────────
+     Phosphor icons are text: size them with font-size, colour with color. */
+  --icon-sm: 16px;              /* inline with body copy */
+  --icon-md: 18px;              /* buttons, nav */
+  --icon-lg: 24px;              /* section accents */
+  --icon-xl: 32px;              /* feature callouts */
+
+  /* ── Type scale ───────────────────────────────────────────────────────
+     Everything is weight 400. No light display type, no bold headings —
+     size and letter-spacing carry the hierarchy instead of weight. */
+
+  --text-hero: clamp(2rem, 4vw, 3.4rem);   /* page title */
+  --text-h2: 2.25rem;                       /* section title */
+  --text-h3: clamp(1.55rem, 1.7vw, 2rem);   /* card / column title */
+  --text-lead: 1.125rem;                    /* section subtitle */
+  --text-body: 0.875rem;                    /* body copy */
+  --text-meta: 0.75rem;                     /* captions, legal */
+  --text-label: 0.6875rem;                  /* uppercase labels */
+
+  --leading-tight: 1.05;        /* headings */
+  --leading-normal: 1.55;       /* body */
+
+  --tracking-hero: -0.03em;     /* tighten as type grows */
+  --tracking-title: -0.02em;
+  --tracking-label: 0.12em;     /* open up small uppercase labels */
+
+  /* ── Spacing ──────────────────────────────────────────────────────────
+     Section rhythm is generous; in-component spacing is tight. */
+  --space-section: 8rem;
+  --space-section-sm: 4.5rem;
+  --space-block: 3.2rem;
+  --space-lg: 1.6rem;
+  --space-md: 1rem;
+  --space-sm: 0.6875rem;
+  --space-xs: 0.4375rem;
+
+  /* ── Layout ───────────────────────────────────────────────────────────
+     A percentage container, not a fixed max-width. It keeps the same
+     margin ratio on every screen instead of stranding wide monitors. */
+  --container: 80%;
+  --container-sm: 95%;
+
+  /* ── Radius ───────────────────────────────────────────────────────────
+     Large and confident. Small radii read as generic bootstrap. */
+  --radius-panel: 76.8px;       /* the big rounded footer/hero panel */
+  --radius-surface: 28px;       /* cards, media frames */
+  --radius-nested: 22px;        /* cards inside cards */
+  --radius-chip: 7px;           /* buttons inside an app mockup */
+  --radius-pill: 999px;         /* nav, CTAs */
+
+  /* ── Elevation ────────────────────────────────────────────────────────
+     Two layers: a tight contact shadow plus a wide soft one. */
+  --shadow-panel:
+    0 30px 80px -24px rgba(0, 0, 0, 0.72),
+    0 8px 24px -8px rgba(0, 0, 0, 0.46);
+  --shadow-raised:
+    0 1px 2px rgba(0, 0, 0, 0.16),
+    0 4px 12px rgba(0, 0, 0, 0.12);
+  --shadow-tile: 0 6px 20px -6px rgba(27, 29, 34, 0.45);
+
+  /* ── Motion ───────────────────────────────────────────────────────────
+     Two curves. `--ease-out` for things entering, `--ease-swap` for things
+     trading places. Durations stay under 700ms. */
+  --ease-out: cubic-bezier(0.2, 0.9, 0.25, 1);
+  --ease-swap: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --dur-fast: 150ms;
+  --dur-base: 350ms;
+  --dur-slow: 700ms;
+
+  /* ── Chrome ───────────────────────────────────────────────────────────
+     The floating nav pill. */
+  --nav-bg: rgba(8, 11, 9, 0.94);
+  --nav-bg-scrolled: rgba(8, 11, 9, 0.97);
+  --nav-blur: blur(10px) saturate(1.1);
+}
+
+@media (max-width: 768px) {
+  :root {
+    --container: var(--container-sm);
+    --space-section: var(--space-section-sm);
+    --radius-panel: 28px;
+    --radius-surface: 22px;
+    --radius-nested: 14px;
+  }
+}
