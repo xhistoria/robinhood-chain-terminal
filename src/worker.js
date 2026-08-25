@@ -65,7 +65,7 @@ async function indexLatestRange({ env, db, latestBlock, fetchImpl = fetch, now =
       await db.prepare(`INSERT INTO assets (address, symbol, name, asset_type, transferability, market_status, last_seen_block, last_updated_at, metadata_json) VALUES (?, NULL, NULL, 'unknown', 'unknown', 'unknown', ?, ?, '{}') ON CONFLICT(address) DO UPDATE SET last_seen_block=excluded.last_seen_block, last_updated_at=excluded.last_updated_at`).bind(record.tokenAddress, record.blockNumber, now).run();
     }
     await db.prepare('INSERT INTO ingestion_cursors (chain_id, last_processed_block, status, updated_at, error_code) VALUES (?, ?, ?, ?, NULL) ON CONFLICT(chain_id) DO UPDATE SET last_processed_block=excluded.last_processed_block, status=excluded.status, updated_at=excluded.updated_at, error_code=NULL').bind(chainId, range.to, 'live', now).run();
-    return { status: 'indexed', indexed: records.length, range, lastProcessedBlock: range.to };
+    return { status: 'indexed', indexed: records.length, records, range, lastProcessedBlock: range.to };
   } catch (error) {
     await db.prepare('INSERT INTO ingestion_cursors (chain_id, last_processed_block, status, updated_at, error_code) VALUES (?, ?, ?, ?, ?) ON CONFLICT(chain_id) DO UPDATE SET status=excluded.status, updated_at=excluded.updated_at, error_code=excluded.error_code').bind(chainId, lastProcessed, 'backfill_error', now, error?.message || 'index_failed').run();
     return { status: 'backfill_error', indexed: 0, range, errorCode: error?.message || 'index_failed' };
@@ -102,9 +102,22 @@ async function addWatchlist(db, address) {
   return { assetAddress: normalized, status: 'watchlisted' };
 }
 
+async function removeWatchlist(db, address) {
+  const normalized = String(address || '').toLowerCase();
+  if (!/^0x[a-f0-9]{40}$/.test(normalized)) return { error: 'invalid_asset_address' };
+  await db.prepare('DELETE FROM watchlist WHERE asset_address = ?').bind(normalized).run();
+  return { assetAddress: normalized, status: 'removed' };
+}
+
 async function listAlerts(db) {
   if (!db) return [];
   const result = await db.prepare('SELECT * FROM alerts ORDER BY created_at DESC').all();
+  return result.results || [];
+}
+
+async function listAlertEvents(db) {
+  if (!db) return [];
+  const result = await db.prepare('SELECT * FROM alert_events ORDER BY observed_at DESC LIMIT 100').all();
   return result.results || [];
 }
 
@@ -144,6 +157,32 @@ async function paperSummary(db) {
   return [...byAsset.values()].map((position) => ({ ...position, currentPrice: null, pnl: calculatePaperPnl({ quantity: position.quantity, entryPrice: position.quantity ? position.invested / position.quantity : null, currentPrice: null }) }));
 }
 
+async function evaluateAlerts(db, records = []) {
+  if (!db || !records.length) return 0;
+  const alerts = await db.prepare('SELECT * FROM alerts WHERE enabled = 1').all();
+  let created = 0;
+  for (const alert of alerts.results || []) {
+    const matches = records.filter((record) => record.tokenAddress === alert.asset_address);
+    if (alert.kind === 'transfer_activity' && matches.length >= Number(alert.threshold || 1)) {
+      const now = new Date().toISOString();
+      await db.prepare('INSERT INTO alert_events (alert_id, asset_address, kind, message, observed_at) VALUES (?, ?, ?, ?, ?)').bind(alert.id, alert.asset_address, alert.kind, `${matches.length} transfer events observed in the latest indexing window`, now).run();
+      await db.prepare('UPDATE alerts SET last_triggered_at = ? WHERE id = ?').bind(now, alert.id).run();
+      created += 1;
+    }
+  }
+  return created;
+}
+
+async function executionPreview(db, body) {
+  const address = String(body?.assetAddress || '').toLowerCase();
+  const side = body?.side;
+  const quantity = Number(body?.quantity);
+  if (!/^0x[a-f0-9]{40}$/.test(address) || !['buy', 'sell'].includes(side) || !Number.isFinite(quantity) || quantity <= 0) return { status: 'invalid', error: 'invalid_execution_preview' };
+  const asset = await db.prepare('SELECT address, symbol, name FROM assets WHERE address = ?').bind(address).first();
+  if (!asset) return { status: 'unknown', error: 'asset_not_found' };
+  return { status: 'preview_only', executionEnabled: false, signingRequired: false, broadcasted: false, asset, side, quantity, price: null, slippage: null, gas: null, reason: 'execution layer is intentionally disabled until market routing and transaction simulation are independently verified' };
+}
+
 async function handle(request, env, ctx) {
   const url = new URL(request.url);
   if (url.pathname === '/api/health') return Response.json({ ok: true, service: 'robinhood-chain-terminal' });
@@ -151,11 +190,14 @@ async function handle(request, env, ctx) {
   if (url.pathname === '/api/assets') return Response.json({ assets: await listAssets(env.DB, url.searchParams.get('limit')), marketData: classifyMarketData(), freshness: env.DB ? 'database' : 'unknown' }, { headers: { 'Cache-Control': 'no-store' } });
   if (url.pathname === '/api/watchlist' && request.method === 'GET') return Response.json({ watchlist: await listWatchlist(env.DB) }, { headers: { 'Cache-Control': 'no-store' } });
   if (url.pathname === '/api/watchlist' && request.method === 'POST') return Response.json(await addWatchlist(env.DB, (await request.json()).assetAddress), { status: 201 });
+  if (url.pathname.startsWith('/api/watchlist/') && request.method === 'DELETE') return Response.json(await removeWatchlist(env.DB, url.pathname.slice('/api/watchlist/'.length)));
   if (url.pathname === '/api/alerts' && request.method === 'GET') return Response.json({ alerts: await listAlerts(env.DB) }, { headers: { 'Cache-Control': 'no-store' } });
   if (url.pathname === '/api/alerts' && request.method === 'POST') return Response.json(await addAlert(env.DB, await request.json()), { status: 201 });
+  if (url.pathname === '/api/alerts/events' && request.method === 'GET') return Response.json({ events: await listAlertEvents(env.DB) }, { headers: { 'Cache-Control': 'no-store' } });
   if (url.pathname === '/api/paper/trades' && request.method === 'GET') return Response.json({ trades: await listPaperTrades(env.DB) }, { headers: { 'Cache-Control': 'no-store' } });
   if (url.pathname === '/api/paper/trades' && request.method === 'POST') return Response.json(await addPaperTrade(env.DB, await request.json()), { status: 201 });
   if (url.pathname === '/api/paper/summary' && request.method === 'GET') return Response.json({ positions: await paperSummary(env.DB), execution: 'paper_only' }, { headers: { 'Cache-Control': 'no-store' } });
+  if (url.pathname === '/api/execution/preview' && request.method === 'POST') return Response.json(await executionPreview(env.DB, await request.json()));
   if (url.pathname.startsWith('/api/assets/')) {
     const detail = await assetDetail(env.DB, decodeURIComponent(url.pathname.slice('/api/assets/'.length)));
     return detail ? Response.json(detail, { headers: { 'Cache-Control': 'no-store' } }) : Response.json({ error: 'asset_not_found' }, { status: 404 });
@@ -168,7 +210,10 @@ async function scheduled(event, env, ctx) {
     const status = await getStatus(env, fetch);
     if (!env.DB) return;
     await env.DB.prepare(`INSERT INTO chain_status (chain_id, latest_block, observed_at, provider, status, latency_ms, error_code) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(chain_id) DO UPDATE SET latest_block=excluded.latest_block, observed_at=excluded.observed_at, provider=excluded.provider, status=excluded.status, latency_ms=excluded.latency_ms, error_code=excluded.error_code`).bind(status.chainId, status.latestBlock, status.observedAt || new Date().toISOString(), status.provider, status.status, status.latencyMs, status.errorCode).run();
-    if (status.status === 'live') await indexLatestRange({ env, db: env.DB, latestBlock: status.latestBlock });
+    if (status.status === 'live') {
+      const indexed = await indexLatestRange({ env, db: env.DB, latestBlock: status.latestBlock });
+      if (indexed.status === 'indexed') await evaluateAlerts(env.DB, indexed.records || []);
+    }
   })());
 }
 
