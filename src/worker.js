@@ -1,9 +1,12 @@
 import { TRANSFER_TOPIC, decodeTransferLog, buildBlockRange, hexBlock, classifyMarketData } from './indexer.js';
 import { buildTradeabilityPassport, calculatePaperPnl, normalizeAlert } from './product.js';
+import { decodeAbiString, decodeAbiUint, metadataCallData, normalizeMetadata } from './metadata.js';
+import { fetchMarketData, marketStatusFromError } from './market.js';
 
 const DEFAULT_CHAIN_ID = '4663';
 const DEFAULT_RPC_TIMEOUT_MS = 3000;
 const MAX_INDEX_BLOCKS = 5;
+const MAX_METADATA_ASSETS = 3;
 
 function freshness(observedAt, now = Date.now()) {
   if (!observedAt) return 'unknown';
@@ -72,6 +75,49 @@ async function indexLatestRange({ env, db, latestBlock, fetchImpl = fetch, now =
   }
 }
 
+async function fetchTokenMetadata({ env, address, fetchImpl = fetch }) {
+  const call = (data) => rpcCall({ env, method: 'eth_call', params: [{ to: address, data }, 'latest'], fetchImpl });
+  const results = await Promise.allSettled([call(metadataCallData.symbol), call(metadataCallData.name), call(metadataCallData.decimals)]);
+  const [symbolResult, nameResult, decimalsResult] = results;
+  return normalizeMetadata({
+    symbol: symbolResult.status === 'fulfilled' ? decodeAbiString(symbolResult.value) : null,
+    name: nameResult.status === 'fulfilled' ? decodeAbiString(nameResult.value) : null,
+    decimals: decimalsResult.status === 'fulfilled' ? decodeAbiUint(decimalsResult.value) : null,
+  });
+}
+
+async function enrichTokenMetadata({ env, db, fetchImpl = fetch, now = new Date().toISOString(), limit = MAX_METADATA_ASSETS }) {
+  if (!db) return { status: 'database_unavailable', enriched: 0 };
+  const assets = await db.prepare("SELECT address FROM assets WHERE metadata_status = 'unknown' OR metadata_status IS NULL ORDER BY last_updated_at DESC LIMIT ?").bind(limit).all();
+  let enriched = 0;
+  for (const asset of assets.results || []) {
+    try {
+      const metadata = await fetchTokenMetadata({ env, address: asset.address, fetchImpl });
+      await db.prepare('UPDATE assets SET symbol = ?, name = ?, metadata_status = ?, metadata_source = ?, metadata_updated_at = ? WHERE address = ?').bind(metadata.symbol, metadata.name, metadata.status, metadata.source, now, asset.address).run();
+      enriched += 1;
+    } catch {
+      await db.prepare('UPDATE assets SET metadata_status = ?, metadata_source = ?, metadata_updated_at = ? WHERE address = ?').bind('provider_unavailable', 'erc20_contract', now, asset.address).run();
+    }
+  }
+  return { status: 'completed', enriched };
+}
+
+async function enrichMarketData({ db, fetchImpl = fetch, now = new Date().toISOString(), limit = MAX_METADATA_ASSETS }) {
+  if (!db) return { status: 'database_unavailable', enriched: 0 };
+  const assets = await db.prepare("SELECT address FROM assets WHERE market_updated_at IS NULL OR market_updated_at < datetime('now', '-5 minutes') ORDER BY last_updated_at DESC LIMIT ?").bind(limit).all();
+  let enriched = 0;
+  for (const asset of assets.results || []) {
+    try {
+      const market = await fetchMarketData({ address: asset.address, fetchImpl });
+      await db.prepare('UPDATE assets SET market_status = ?, market_price = ?, market_liquidity_usd = ?, market_source = ?, market_pair_address = ?, market_venue = ?, market_updated_at = ? WHERE address = ?').bind(market.status, market.price, market.liquidityUsd, market.source, market.pairAddress, market.venue, now, asset.address).run();
+      enriched += 1;
+    } catch (error) {
+      await db.prepare('UPDATE assets SET market_status = ?, market_source = ?, market_updated_at = ? WHERE address = ?').bind(marketStatusFromError(error), 'dexscreener', now, asset.address).run();
+    }
+  }
+  return { status: 'completed', enriched };
+}
+
 async function listAssets(db, limit = 50) {
   if (!db) return [];
   const result = await db.prepare(`SELECT a.*, (SELECT COUNT(*) FROM token_transfers t WHERE t.token_address = a.address) AS transfer_count, (SELECT COUNT(DISTINCT t.from_address) FROM token_transfers t WHERE t.token_address = a.address) AS unique_senders FROM assets a ORDER BY a.last_updated_at DESC LIMIT ?`).bind(Math.min(Math.max(Number(limit) || 50, 1), 100)).all();
@@ -83,7 +129,7 @@ async function assetDetail(db, address) {
   const asset = await db.prepare(`SELECT a.*, (SELECT COUNT(*) FROM token_transfers t WHERE t.token_address = a.address) AS transfer_count, (SELECT COUNT(DISTINCT t.from_address) FROM token_transfers t WHERE t.token_address = a.address) AS unique_senders FROM assets a WHERE a.address = ?`).bind(address.toLowerCase()).first();
   if (!asset) return null;
   const activity = await db.prepare('SELECT * FROM token_transfers WHERE token_address = ? ORDER BY block_number DESC, log_index DESC LIMIT 25').bind(address.toLowerCase()).all();
-  const market = classifyMarketData();
+  const market = classifyMarketData({ price: asset.market_price, liquidityUsd: asset.market_liquidity_usd, source: asset.market_source });
   return { ...asset, activity: activity.results || [], market, passport: buildTradeabilityPassport({ ...asset, transferCount: asset.transfer_count, uniqueSenders: asset.unique_senders, market }) };
 }
 
@@ -213,9 +259,11 @@ async function scheduled(event, env, ctx) {
     if (status.status === 'live') {
       const indexed = await indexLatestRange({ env, db: env.DB, latestBlock: status.latestBlock });
       if (indexed.status === 'indexed') await evaluateAlerts(env.DB, indexed.records || []);
+      await enrichTokenMetadata({ env, db: env.DB });
+      await enrichMarketData({ db: env.DB });
     }
   })());
 }
 
-export { fetchLatestBlock, freshness, getStatus, rpcCall, indexLatestRange, listAssets, assetDetail };
+export { fetchLatestBlock, freshness, getStatus, rpcCall, indexLatestRange, enrichTokenMetadata, fetchTokenMetadata, enrichMarketData, listAssets, assetDetail };
 export default { fetch: handle, scheduled };

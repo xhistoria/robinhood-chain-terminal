@@ -45,6 +45,23 @@ async function loadWatchlist() {
   renderWatchlist(await response.json());
 }
 
+async function saveAlert(event) {
+  event.preventDefault();
+  const threshold = $('#alert-threshold').value;
+  const response = await fetch('/api/alerts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ assetAddress: $('#alert-address').value, kind: $('#alert-kind').value, threshold: threshold === '' ? null : Number(threshold) }) });
+  const data = await response.json();
+  $('#alert-status').textContent = data.status === 'saved' ? 'Alert saved. It will be evaluated on the next Cron run.' : (data.error || 'Unable to save alert.');
+  if (data.status === 'saved') { event.target.reset(); await loadAlerts(); }
+}
+
+async function loadAlerts() {
+  const [rulesResponse, eventsResponse] = await Promise.all([fetch('/api/alerts', { cache: 'no-store' }), fetch('/api/alerts/events', { cache: 'no-store' })]);
+  const rules = await rulesResponse.json();
+  const events = await eventsResponse.json();
+  $('#alert-status').textContent = `${(rules.alerts || []).length} alert rule(s) configured.`;
+  $('#alert-events').innerHTML = (events.events || []).length ? events.events.map((event) => `<div class="watch-item"><strong>${esc(event.kind)}</strong><small>${esc(event.asset_address)} · ${esc(event.message)}</small></div>`).join('') : 'No alert events.';
+}
+
 async function savePaperTrade(event) {
   event.preventDefault();
   const response = await fetch('/api/paper/trades', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ assetAddress: $('#paper-address').value, side: $('#paper-side').value, quantity: $('#paper-quantity').value, price: $('#paper-price').value || null }) });
@@ -60,6 +77,7 @@ async function refresh() {
     renderStatus(await statusResponse.json());
     renderAssets(await assetsResponse.json());
     await loadWatchlist();
+    await loadAlerts();
   } catch {
     renderStatus({ status: 'api_unavailable', freshness: 'unknown', latestBlock: null });
     $('#asset-count').textContent = 'Unknown';
@@ -69,5 +87,6 @@ async function refresh() {
 
 $('#refresh').addEventListener('click', refresh);
 $('#paper-form').addEventListener('submit', savePaperTrade);
+$('#alert-form').addEventListener('submit', saveAlert);
 refresh();
 setInterval(refresh, 30_000);
