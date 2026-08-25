@@ -1,4 +1,5 @@
 import { TRANSFER_TOPIC, decodeTransferLog, buildBlockRange, hexBlock, classifyMarketData } from './indexer.js';
+import { buildTradeabilityPassport, calculatePaperPnl, normalizeAlert } from './product.js';
 
 const DEFAULT_CHAIN_ID = '4663';
 const DEFAULT_RPC_TIMEOUT_MS = 3000;
@@ -82,7 +83,65 @@ async function assetDetail(db, address) {
   const asset = await db.prepare(`SELECT a.*, (SELECT COUNT(*) FROM token_transfers t WHERE t.token_address = a.address) AS transfer_count, (SELECT COUNT(DISTINCT t.from_address) FROM token_transfers t WHERE t.token_address = a.address) AS unique_senders FROM assets a WHERE a.address = ?`).bind(address.toLowerCase()).first();
   if (!asset) return null;
   const activity = await db.prepare('SELECT * FROM token_transfers WHERE token_address = ? ORDER BY block_number DESC, log_index DESC LIMIT 25').bind(address.toLowerCase()).all();
-  return { ...asset, activity: activity.results || [], market: classifyMarketData() };
+  const market = classifyMarketData();
+  return { ...asset, activity: activity.results || [], market, passport: buildTradeabilityPassport({ ...asset, transferCount: asset.transfer_count, uniqueSenders: asset.unique_senders, market }) };
+}
+
+async function listWatchlist(db) {
+  if (!db) return [];
+  const result = await db.prepare('SELECT w.*, a.symbol, a.name, a.last_seen_block, a.market_status FROM watchlist w LEFT JOIN assets a ON a.address = w.asset_address ORDER BY w.created_at DESC').all();
+  return result.results || [];
+}
+
+async function addWatchlist(db, address) {
+  const normalized = String(address || '').toLowerCase();
+  if (!/^0x[a-f0-9]{40}$/.test(normalized)) return { error: 'invalid_asset_address' };
+  const exists = await db.prepare('SELECT address FROM assets WHERE address = ?').bind(normalized).first();
+  if (!exists) return { error: 'asset_not_found' };
+  await db.prepare('INSERT OR IGNORE INTO watchlist (asset_address, created_at) VALUES (?, ?)').bind(normalized, new Date().toISOString()).run();
+  return { assetAddress: normalized, status: 'watchlisted' };
+}
+
+async function listAlerts(db) {
+  if (!db) return [];
+  const result = await db.prepare('SELECT * FROM alerts ORDER BY created_at DESC').all();
+  return result.results || [];
+}
+
+async function addAlert(db, body) {
+  const rule = normalizeAlert(body || {});
+  if (!rule) return { error: 'invalid_alert_rule' };
+  await db.prepare('INSERT INTO alerts (asset_address, kind, threshold, enabled, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(asset_address, kind) DO UPDATE SET threshold=excluded.threshold, enabled=excluded.enabled').bind(rule.assetAddress, rule.kind, rule.threshold, rule.enabled ? 1 : 0, new Date().toISOString()).run();
+  return { ...rule, status: 'saved' };
+}
+
+async function listPaperTrades(db) {
+  if (!db) return [];
+  const result = await db.prepare('SELECT * FROM paper_trades ORDER BY created_at DESC LIMIT 100').all();
+  return result.results || [];
+}
+
+async function addPaperTrade(db, body) {
+  const address = String(body?.assetAddress || '').toLowerCase();
+  const side = body?.side;
+  const quantity = Number(body?.quantity);
+  const price = body?.price === null || body?.price === undefined || body?.price === '' ? null : Number(body.price);
+  if (!/^0x[a-f0-9]{40}$/.test(address) || !['buy', 'sell'].includes(side) || !Number.isFinite(quantity) || quantity <= 0 || (price !== null && (!Number.isFinite(price) || price < 0))) return { error: 'invalid_paper_trade' };
+  await db.prepare('INSERT INTO paper_trades (asset_address, side, quantity, price, note, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(address, side, quantity, price, body?.note || null, new Date().toISOString()).run();
+  return { status: 'paper_trade_saved', assetAddress: address, side, quantity, price };
+}
+
+async function paperSummary(db) {
+  const trades = await listPaperTrades(db);
+  const byAsset = new Map();
+  for (const trade of trades) {
+    const current = byAsset.get(trade.asset_address) || { assetAddress: trade.asset_address, quantity: 0, invested: 0 };
+    const signed = trade.side === 'buy' ? Number(trade.quantity) : -Number(trade.quantity);
+    current.quantity += signed;
+    if (trade.price !== null) current.invested += (trade.side === 'buy' ? 1 : -1) * Number(trade.quantity) * Number(trade.price);
+    byAsset.set(trade.asset_address, current);
+  }
+  return [...byAsset.values()].map((position) => ({ ...position, currentPrice: null, pnl: calculatePaperPnl({ quantity: position.quantity, entryPrice: position.quantity ? position.invested / position.quantity : null, currentPrice: null }) }));
 }
 
 async function handle(request, env, ctx) {
@@ -90,6 +149,13 @@ async function handle(request, env, ctx) {
   if (url.pathname === '/api/health') return Response.json({ ok: true, service: 'robinhood-chain-terminal' });
   if (url.pathname === '/api/chain-status') return Response.json(await getStatus(env, fetch), { headers: { 'Cache-Control': 'no-store' } });
   if (url.pathname === '/api/assets') return Response.json({ assets: await listAssets(env.DB, url.searchParams.get('limit')), marketData: classifyMarketData(), freshness: env.DB ? 'database' : 'unknown' }, { headers: { 'Cache-Control': 'no-store' } });
+  if (url.pathname === '/api/watchlist' && request.method === 'GET') return Response.json({ watchlist: await listWatchlist(env.DB) }, { headers: { 'Cache-Control': 'no-store' } });
+  if (url.pathname === '/api/watchlist' && request.method === 'POST') return Response.json(await addWatchlist(env.DB, (await request.json()).assetAddress), { status: 201 });
+  if (url.pathname === '/api/alerts' && request.method === 'GET') return Response.json({ alerts: await listAlerts(env.DB) }, { headers: { 'Cache-Control': 'no-store' } });
+  if (url.pathname === '/api/alerts' && request.method === 'POST') return Response.json(await addAlert(env.DB, await request.json()), { status: 201 });
+  if (url.pathname === '/api/paper/trades' && request.method === 'GET') return Response.json({ trades: await listPaperTrades(env.DB) }, { headers: { 'Cache-Control': 'no-store' } });
+  if (url.pathname === '/api/paper/trades' && request.method === 'POST') return Response.json(await addPaperTrade(env.DB, await request.json()), { status: 201 });
+  if (url.pathname === '/api/paper/summary' && request.method === 'GET') return Response.json({ positions: await paperSummary(env.DB), execution: 'paper_only' }, { headers: { 'Cache-Control': 'no-store' } });
   if (url.pathname.startsWith('/api/assets/')) {
     const detail = await assetDetail(env.DB, decodeURIComponent(url.pathname.slice('/api/assets/'.length)));
     return detail ? Response.json(detail, { headers: { 'Cache-Control': 'no-store' } }) : Response.json({ error: 'asset_not_found' }, { status: 404 });
